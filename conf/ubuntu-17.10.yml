@@ -1,0 +1,528 @@
+# Ubuntu 17.10 Post installation configuration
+# Authors: GammaDraconis, mickbad
+
+# Global
+info_config: Ubuntu Artful
+info_version: "17.10"
+info_description: |
+  Voici la légende pour vous informer de certaines choses :
+
+  [yellow][Snap][/yellow] => Le paquet s'installera avec Snap (snap install...)
+  [blue][Flatpak][/blue] => S'installera avec Flatpak, une alternative aux snaps (flatpak install --from...)
+  [green][Appimage][/green] => Application portable (pas d'installation), à lancer comme ceci : ./nomdulogiciel.AppImage
+  [red][Interv!][/red] => Installation pas totalement automatisé : vous devrez intervenir (ex : valider contrat de licence...)
+  [purple][Xorg only!][/purple] => Le logiciel fonctionnera correctement uniquement en session Xorg mais pas sous Wayland (NB : sur les variantes vous êtes en Xorg)
+  [cyan][à lancer manuellement][/cyan] => Il n'y aura pas de raccourci, il faudra aller manuellement dans le dossier et le lancer via celui-ci
+
+  Si rien de précisé en encadré => Installation classique depuis les dépots officiels si c'est possible (sinon PPA ou dépot externe)
+
+info_description_end: |
+  Pour prendre en compte tous les changements, il faut maintenant redémarrer !
+
+# Installation mode (begginer, standard, export, extra, ...)
+levels-install:
+  description: "[blue]1/ Mode de lancement du script :[/blue]"
+  1: "Mode [gray]novice[/gray] (lancement automatique sans question, le script installera des logiciels intéressants pour les novices)"
+  2: "Mode [blue]standard[/blue] (choix par défaut, pose diverses questions simples, recommandé pour la plupart des utilisateurs)"
+  3: "Mode [yellow]avancé[/yellow] (comme standard mais avec des questions supplémentaires : programmation, optimisation, extension...)"
+  4: "Mode [green]extra[/green] (comme avancé mais avec un supplément snap/flatpak/appimages proposé à la fin)"
+
+# environment variables
+environment:
+  # Pour automatiser l'instalaliton de certains logiciels qui pose des questions :
+  DEBIAN_FRONTEND: "noninteractive"
+  TEST: coucou c'est moi
+
+# Pre installation
+pre-install:
+  # Activation du dépot partenaire 
+  - sed -i "/^# deb .*partner/ s/^# //" /etc/apt/sources.list
+
+  # Maj du système + nettoyage
+  - apt update ; apt full-upgrade -y ; apt autoremove --purge -y ; apt clean
+
+  # Paquet Snappy & Flatpak (snapd est déjà installé sur Ubuntu mais pas forcément sur les dérivés)
+  - apt install snapd flatpak -y
+
+  # Police d'écriture Microsoft
+  - echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | /usr/bin/debconf-set-selections | apt install ttf-mscorefonts-installer -y
+
+  # Autres outils utiles
+  - apt install inxi curl net-tools git gdebi vim htop gparted openjdk-8-jre hardinfo ppa-purge numlockx unace unrar debconf-utils -y
+
+  # Codecs utiles
+  - apt install x264 x265 -y
+
+  # optimisation
+  #  permet de charger les minatures vidéos plus rapidement dans nautilus
+  - apt install ffmpegthumbnailer -y
+
+  # Désactivation de l'affichage des messages d'erreurs à l'écran
+  - sed -i 's/^enabled=1$/enabled=0/' /etc/default/apport
+
+
+# Post Installation after modules
+post-install:
+  # Suppression des deb téléchargés par le script (plus nécessaire) et rangement des AppImages
+  - mkdir ./appimages ; rm *.deb ; mv *.AppImage ./appimages/
+  - chown -R $USER:$USER ./appimages
+  - chmod -R +x ./appimages
+
+  # Finalisation & nettoyage
+  - chown -R $USER /home/$USER/.local/share/gnome-shell/extensions
+  - rm -f *-extension.zip 
+
+  # Maj
+  - apt update ; apt install -fy ; apt autoremove --purge -y ; apt clean ; apt full-upgrade -y
+  - flatpak update -y ; snap refresh ; clear  
+
+
+# Installation configuration
+install:
+  - theme: "Navigateur Web"
+    enabled: true
+    level: 2
+    description: "[blue]Quel(s) navigateur(s) vous intéresse(nt) ? (plusieurs choix possibles)[/blue]"
+    question: "Répondre par le ou les chiffres correspondants séparés d'un espace (exemple : 6 10 16)"
+    programs:
+      - "Firefox Béta (n+1 : 1 version d'avance, remplace la version classique)":
+        - add-apt-repository ppa:mozillateam/firefox-next -y 
+        - apt update ; apt upgrade -y
+
+      - "Firefox ESR (version plutôt orientée entreprise/organisation)":
+        - add-apt-repository ppa:mozillateam/ppa -y 
+        - apt update ; apt install firefox-esr firefox-esr-locale-fr -y
+
+      - "Firefox Developer Edition [blue][Flatpak][/blue] (version alternative incluant des outils de développement, généralement n+1/n+2)":
+        - flatpak install --from https://firefox-flatpak.mojefedora.cz/org.mozilla.FirefoxDevEdition.flatpakref -y
+
+      - "Firefox Nightly [blue][Flatpak][/blue] (toute dernière build construite, n+2/n+3, [red]potentiellement instable ![/red])":
+        - flatpak install --from https://firefox-flatpak.mojefedora.cz/org.mozilla.FirefoxNightly.flatpakref -y
+
+      - "Chromium (la version libre/opensource de Chrome)":
+        - apt install chromium-browser -y
+
+      - "Google Chrome (le célèbre navigateur de Google mais il est propriétaire !)":
+        - wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+        - sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+        - apt update ; apt install google-chrome-stable -y
+
+      - "Vivaldi (un navigateur propriétaire avec une interface sobre assez particulière)":
+        - apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 2CC26F777B8B44A1
+        - echo "deb http://repo.vivaldi.com/stable/deb/ stable main" >> /etc/apt/sources.list.d/vivaldi.list
+        - apt update ; apt install vivaldi-stable -y
+
+      - "Opera (un navigateur propriétaire relativement connu)":
+        - wget -q http://deb.opera.com/archive.key -O- | apt-key add -
+        - apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 517590D9A8492E35
+        - echo "deb https://deb.opera.com/opera/ stable non-free" | tee -a /etc/apt/sources.list.d/opera-stable.list
+        - echo "opera-stable opera-stable/add-deb-source boolean true\n" | debconf-set-selections
+        - apt update ; apt install opera-stable -y
+
+      - "PaleMoon (un navigateur plutôt récent, libre & performant)":
+        - wget http://nux87.free.fr/script-postinstall-ubuntu/deb/palemoon27.6.2-amd64.deb
+        - dpkg -i palemoon27.6.2-amd64.deb ; apt install -fy ; rm palemoon27.6.2-amd64.deb
+
+      - "WaterFox (un fork de Firefox compatible avec les anciennes extensions)":
+        - echo "deb https://dl.bintray.com/hawkeye116477/waterfox-deb release main" >> /etc/apt/sources.list.d/waterfox.list
+        - curl https://bintray.com/user/downloadSubjectPublicKey?username=hawkeye116477 | apt-key add - 
+        - apt update
+        - apt install waterfox waterfox-locale-fr -y
+
+      - "Tor Browser (pour naviguer dans l'anonymat avec le réseau tor : basé sur Firefox ESR)":
+        - apt install torbrowser-launcher -y
+
+      - "Gnome Web/Epiphany (navigateur de la fondation Gnome s'intégrant bien avec cet environnement)":
+        - apt install epiphany-browser -y
+
+      - "Midori (libre & léger mais un peu obsolète maintenant...)":
+        - wget http://midori-browser.org/downloads/midori_0.5.11-0_amd64_.deb
+        - dpkg -i midori_0.5.11-0_amd64_.deb
+        - apt install -fy
+
+      - "QupZilla/Falkon (une alternative libre et légère utilisant Webkit)":
+        - apt install qupzilla -y
+
+      - "Min (un navigateur minimaliste et donc très léger)":
+        - wget https://github.com/minbrowser/min/releases/download/v1.6.3/Min_1.6.3_amd64.deb
+        - dpkg -i Min_1.6.3_amd64.deb
+        - apt install -fy
+
+      - "NetSurf (basique mais très léger et performant)":
+        - apt install netsurf-gtk -y
+
+      - "Dillo (navigateur capable de tourner sur des ordinosaures)":
+        - apt install dillo -y
+
+      - "Lynx (navigateur 100% en ligne de commande, pratique depuis une console SSH)":
+        - apt install lynx -y
+
+      - "Rekonq (navigateur web conçu surtout pour KDE)":
+        - apt install rekonq -y
+
+      - "Eolie [blue][Flatpak][/blue] (une autre alternative pour Gnome)":
+        - flatpak install --from https://flathub.org/repo/appstream/org.gnome.Eolie.flatpakref -y
+
+  - theme: "Messagerie instantanée"
+    enabled: true
+    level: 2
+    description: "[blue]Quel(s) logiciel(s) de messagerie instantanée/tchat/VoIP/visio souhaitez-vous ?[/blue]"
+    question: "Répondre par le ou les chiffres correspondants (exemple : 3 7 13 18)"
+    programs:
+      - "Empathy (messagerie instantanée adaptée à Gnome, multi-protocole)":
+        - apt install empathy -y
+
+      - "Pidgin (une alternative à Empathy avec l'avantage d'être multiplateforme)":
+        - apt install pidgin pidgin-plugin-pack -y
+
+      - "Jitsi (anciennement 'SIP Communicator' surtout orienté VoIP)":
+        - wget -qO - https://download.jitsi.org/jitsi-key.gpg.key | apt-key add -
+        - sh -c "echo 'deb https://download.jitsi.org stable/' > /etc/apt/sources.list.d/jitsi-stable.list"
+        - apt update ; apt install jitsi -y
+
+      - "Psi (multiplateforme, libre et surtout conçu pour le protocole XMPP cad Jabber)":
+        - apt install psi -y
+
+      - "Gajim (un autre client Jabber utilisant GTK+)":
+        - apt install gajim -y
+
+      - "Skype (logiciel propriétaire de téléphonie, vidéophonie et clavardage très connue)":
+        - wget https://repo.skype.com/latest/skypeforlinux-64.deb
+        - dpkg -i skypeforlinux-64.deb
+        - apt install -fy
+
+      - "Ekiga (anciennement 'Gnome Meeting', logiciel de visioconférence/VoIP)":
+        - apt install ekiga -y
+
+      - "Linphone (visioconférence utilisant le protocole SIP)":
+        - apt install linphone -y
+
+      - "Ring (anciennement 'SFLphone', logiciel très performant pour la téléphonie IP)":
+        - apt install ring -y
+
+      - "Mumble (logiciel libre connue chez les gameurs pour les conversations audios à plusieurs)":
+        - apt install mumble -y
+
+      - "Wire (un autre client de messagerie instantanée chiffrée créé par Wire Swiss)":
+        - apt-key adv --fetch-keys http://wire-app.wire.com/linux/releases.key
+        - echo "deb https://wire-app.wire.com/linux/debian stable main" | tee /etc/apt/sources.list.d/wire-desktop.list
+        - apt update ; apt install apt-transport-https wire-desktop -y
+
+      - "Hexchat (client IRC, fork de xchat)":
+        - apt install hexchat hexchat-plugins -y
+
+      - "Polari (client IRC pour Gnome)":
+        - apt install polari -y
+
+      - "Discord [yellow][Snap][/yellow] (logiciel propriétaire multiplateforme pour communiquer à plusieurs, pour les gameurs)":
+        - snap install discord
+
+      - "Telegram [yellow][Snap][/yellow] (appli de messagerie basée sur le cloud avec du chiffrage)":
+        - snap install telegram-sergiusens
+
+      - "Viber [blue][Flatpak][/blue] (logiciel de communication, surtout connu en application mobile)":
+        - flatpak install --from https://flathub.org/repo/appstream/com.viber.Viber.flatpakref -y
+
+      - "Slack [blue][Flatpak][/blue] (plate-forme de communication collaborative propriétaire avec gestion de projets)":
+        - flatpak install --from https://flathub.org/repo/appstream/com.slack.Slack.flatpakref -y
+
+      - "Signal [blue][Flatpak][/blue] (messagerie instantanée cryptée recommandée par Edward Snowden)":
+        - flatpak install --from https://vrutkovs.github.io/flatpak-signal/signal.flatpakref -y
+
+      - "Récupérer TeamSpeak [cyan][script à lancer manuellement][/cyan] (équivalent à Mumble mais propriétaire)":
+        - wget http://dl.4players.de/ts/releases/3.1.6/TeamSpeak3-Client-linux_amd64-3.1.6.run ; chmod +x TeamSpeak* ; chown $USER TeamSpeak*
+        - mv TeamSpeak* /home/$USER/
+
+  - theme: "Download/Upload"
+    enabled: true
+    level: 2
+    description: "[blue]Quel(s) logiciel(s) de téléchargement/copie voulez-vous ?[/blue]"
+    question: "Répondre par le ou les chiffres correspondants (exemple : 2 3 4 15)"
+    programs:
+      - "FileZilla (logiciel très répandu utilisé pour les transferts FTP ou SFTP)":
+        - apt install filezilla -y
+
+      - "Deluge (client BitTorrent basé sur Python et GTK+)":
+        - apt install deluge -y
+
+      - "Rtorrent (client BitTorrent en ligne de commande donc très léger)":
+        - apt install rtorrent screen -y
+
+      - "qBittorrent (client BitTorrent léger développé en C++ avec Qt)":
+        - apt install qbittorrent -y
+
+      - "Bittorrent (client non-libre qui s'utilise depuis le terminal via btdownloadgui)":
+        - apt install bittorrent bittorrent-gui -y
+
+      - "aMule (pour le réseau eDonkey2000, clone de Emule)":
+        - apt install amule -y
+
+      - "FrostWire (client multiplate-forme pour le réseau Gnutella)":
+        - wget https://netcologne.dl.sourceforge.net/project/frostwire/FrostWire%206.x/6.5.9-build-246/frostwire-6.5.9.all.deb
+        - dpkg -i frostwire-6.5.9.all.deb
+        - apt install -fy
+
+      - "Gtk-Gnutella (un autre client stable et léger avec pas mal d'options)":
+        - apt install gtk-gnutella -y
+
+      - "EiskaltDC++ (stable et en français, pour le réseau DirectConnect)":
+        - apt install eiskaltdcpp eiskaltdcpp-gtk3 -y
+
+      - "Grsync (une interface graphique pour l'outil rsync)":
+        - apt install grsync -y
+
+      - "SubDownloader (téléchargement de sous-titre)":
+        - apt install subdownloader -y
+
+      - "Nicotine+ (client P2P pour le réseau mono-source Soulseek)":
+        - apt install nicotine -y
+
+      - "Vuze [yellow][Snap][/yellow] (plate-forme commerciale d'Azureus avec BitTorrent)":
+        - snap install vuze-vs --classic
+
+      - "Gydl [blue][Flatpak][/blue] (permet de télécharger des vidéos Youtube ou juste la piste audio)":
+        - flatpak install --from https://flathub.org/repo/appstream/com.github.JannikHv.Gydl.flatpakref -y
+
+      - "WebTorrent (permet le streamming de flux vidéo décentralisé via le protocole bittorrent)":
+        - wget https://github.com/webtorrent/webtorrent-desktop/releases/download/v0.18.0/webtorrent-desktop_0.18.0-1_amd64.deb
+        - dpkg -i webtorrent-desktop_0.18.0-1_amd64.deb ; apt install -fy ; rm webtorrent-desktop_0.18.0-1_amd64.deb
+
+  - theme: "Lecture multimédia"
+    enabled: true
+    level: 2
+    description: "[blue]Quel(s) logiciel(s) de lecture audio/vidéo (ou de stream) voulez-vous ?[/blue]"
+    question: "Répondre par le ou les chiffres correspondants (exemple : 2 3)"
+    programs:
+      - "VLC VideoLan (le couteau suisse de la vidéo, très complet !)":
+        - apt install vlc vlc-plugin-vlsub vlc-plugin-visualization -y
+
+      #(semble instable dans une VM)
+      - "MPV/Gnome MPV (léger et puissant, capable de lire de nombreux formats)":
+        - apt install gnome-mpv -y
+
+      - "SmPlayer (lecteur basé sur mplayer avec une interface utilisant Qt)":
+        - apt install smplayer smplayer-l10n smplayer-themes -y
+
+      - "DragonPlayer (lecteur vidéo pour l'environnement Kde)" :
+        - apt install dragonplayer -y
+
+      - "Banshee (lecteur audio assez complet équivalent à Rhythmbox)":
+        - apt install banshee -y
+
+      - "Clementine (lecteur audio avec gestion des pochettes, genres musicaux...)":
+        - apt install clementine -y
+
+      - "QuodLibet (un lecteur audio très puissant avec liste de lecture basée sur les expressions rationnelles)":
+        - apt install quodlibet -y
+
+      - "Audacious (lecteur complet pour les audiophiles avec beaucoup de plugins)":
+        - apt install audacious audacious-plugins -y
+
+      - "Guayadeque (lecteur audio et radio avec une interface agréable)":
+        - echo "deb http://ppa.launchpad.net/anonbeat/guayadeque/ubuntu artful main" >> /etc/apt/sources.list.d/anonbeat-ubuntu-guayadeque-bionic.list
+        - apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 95FABEFB4499973B
+        - apt update
+        - apt install guayadeque -y
+
+      - "Gnome Music (utilitaire de la fondation Gnome pour la gestion audio, assez basique)":
+        - apt install gnome-music -y
+
+      - "Gmusicbrowser (lecteur avec une interface très configurable)":
+        - apt install gmusicbrowser -y
+
+      - "Musique (un lecteur épuré)":
+        - apt install musique -y
+
+      - "Qmmp (dans le même style de Winamp pour les fans)":
+        - apt install qmmp -y
+
+      - "Xmms2+Gxmms2 (un autre lecteur audio dans le style de Winamp)":
+        - apt install xmms2 xmms2-plugin-all gxmms2 -y
+
+      - "Gnome Twitch (pour visionner les flux vidéo du site Twitch depuis votre bureau sans utiliser de navigateur)":
+        - apt install gnome-twitch -y
+
+      - "Lollypop [blue ][Flatpak][/blue] (lecteur de musique adapté à Gnome avec des fonctions très avancées)":
+        - flatpak install --from https://flathub.org/repo/appstream/org.gnome.Lollypop.flatpakref -y
+
+      - "Spotify [blue][Flatpak][/blue] (permet d'accéder gratuitement et légalement à de la musique en ligne)":
+        - flatpak install --from https://flathub.org/repo/appstream/com.spotify.Client.flatpakref -y
+
+      - "MuseScore [blue][Flatpak][/blue] (l'éditeur de partitions de musique le plus utilisé au monde !)":
+        - flatpak install --from https://flathub.org/repo/appstream/org.musescore.MuseScore.flatpakref -y
+
+      - "GRadio [blue][Flatpak][/blue] (application Gnome pour écouter la radio, plus de 1 000 références rien qu'en France !)":
+        - flatpak install --from https://flathub.org/repo/appstream/de.haeckerfelix.gradio.flatpakref -y
+
+      - "Molotov.TV [green][Appimage][/green] (service français de distribution de chaînes de TV)":
+        - wget https://desktop-auto-upgrade.s3.amazonaws.com/linux/1.8.0/molotov
+        - mv molotov molotov.AppImage
+        - chmod +x molotov.AppImage
+
+  - theme: "Traitement/montage video"
+    enabled: true
+    level: 2
+    description: "[blue]Souhaitez-vous un logiciel de montage/encodage vidéo ?[/blue]"
+    question: "Répondre par le ou les chiffres correspondants (exemple : 1)"
+    programs:
+      - "Handbrake (transcodage de n'importe quel fichier vidéo)":
+        - apt install handbrake -y
+
+      - "WinFF (encodage vidéo rapide dans différents formats)":
+        - apt install winff winff-doc winff-qt -y
+
+      - "Libav-tools (fork de FFmpeg, outil en CLI pour la conversion via : avconv)":
+        - apt install libav-tools -y
+
+      - "KDEnLive (éditeur vidéo non-linéaire pour monter sons et images avec effets spéciaux)":
+        - apt install kdenlive breeze-icon-theme -y
+
+      - "OpenShot Video Editor (une autre alternative comme éditeur vidéo, libre et écrit en Python)":
+        - echo "deb http://ppa.launchpad.net/openshot.developers/ppa/ubuntu zesty main" >> /etc/apt/sources.list.d/openshot-stable.list 
+        - apt-key adv --recv-keys --keyserver keyserver.ubuntu.com FBA0C227099A5360635E3D9152165BD6B9BA26FA
+        - apt update ; apt install openshot-qt -y
+
+      - "Pitivi (logiciel de montage basique avec une interface simple et intuitive)" :
+        - apt install pitivi -y
+
+      - "Lives (dispose des fonctionnalités d'éditions vidéo/son classique, des filtres et multipiste":
+        - apt install lives -y
+
+      - "Flowblade [purple][Xorg only!][/purple] (logiciel de montage vidéo multi-piste performant)":
+        - apt install flowblade -y
+
+      - "Cinelerra (montage non-linéaire sophistiqué, équivalent à Adobe première, Final Cut et Sony Vegas":
+        - add-apt-repository ppa:cinelerra-ppa/ppa -y
+        - apt update ; apt install cinelerra-cv -y
+
+      - "Natron (programme de post-prod destiné au compositing et aux effets spéciaux)":
+        - wget http://nux87.free.fr/script-postinstall-ubuntu/deb/natron_2.3.3_amd64.deb
+        - dpkg -i natron_2.3.3_amd64.deb
+        - apt install -fy
+
+      - "Mencoder (s'utilise en ligne de commande : encodage de fichiers vidéos)":
+        - apt install mencoder -y
+
+      - "MMG : MkvMergeGui (interface graphique pour l'outil mkmerge : création/manipulation fichier mkv)":
+        - apt install mkvtoolnix mkvtoolnix-gui -y
+
+      - "DeVeDe (création de DVD/CD vidéos lisibles par des lecteurs de salon)":
+        - apt install devede -y
+
+      - "Peek [blue][Flatpak][/blue] (outil de création de Gif animé à partir d'une capture vidéo)":
+        - flatpak install --from https://flathub.org/repo/appstream/com.uploadedlobster.peek.flatpakref -y
+
+      - "Avidemux [green][Appimage][/green][red][Ne semble pas fonctionner !][/red] (équivalent de 'VirtualDub' : coupe, filtre et ré-encodage)":
+        - wget http://nux87.free.fr/script-postinstall-ubuntu/appimage/avidemux2.7.0.AppImage
+        - chmod +x avidemux2.7.0.AppImage
+
+      - "Shotcut (éditeur de vidéos libre, open source, gratuit et multiplateforme)":
+        - add-apt-repository "deb http://ppa.launchpad.net/haraldhv/shotcut/ubuntu zesty main" -y
+        - apt-key adv --recv-keys --keyserver keyserver.ubuntu.com D03D19F673FED66EBD64099959A9D327745898E3
+        - apt update ; apt install shotcut -y
+
+  - theme: "Traitement/montage photo & modélisation 3D"
+    enabled: true
+    level: 2
+    description: "[blue]Quel(s) logiciel(s) de montage photo ou modélisation 3D voulez-vous ?[/blue]"
+    question: "Répondre par le ou les chiffres correspondants (exemple : 2 4)"
+    programs:
+      - "Gimp (montage photo avancé, équivalent à 'Adobe Photoshop')":
+        - apt install gimp gimp-help-fr gimp-plugin-registry gimp-ufraw gimp-data-extras -y
+
+      - "Krita (outil d'édition et retouche d'images, orienté plutôt vers le dessin bitmap)":
+        - apt install krita krita-l10n -y
+
+      - "Pinta (graphisme simple équivalent à Paint.NET)":
+        - apt install pinta -y
+
+      - "Pixeluvo (une autre alternative à Photoshop mais il reste propriétaire)":
+        - wget http://www.pixeluvo.com/downloads/pixeluvo_1.6.0-2_amd64.deb
+        - dpkg -i pixeluvo_1.6.0-2_amd64.deb
+        - apt install -fy
+
+      - "Phatch (pour traiter des images par lot via des scripts prédéfinis)":
+        - apt install phatch phatch-cli -y
+
+      - "MyPaint (logiciel de peinture numérique développé en Python)":
+        - apt install mypaint mypaint-data-extras -y
+
+      - "Ufraw (logiciel de dérawtisation capable de lire/interpréter la plupart des formats RAW)":
+        - apt install ufraw ufraw-batch -y
+
+      - "Inkscape (logiciel spécialisé dans le dessin vectoriel, équivalent de 'Adobe Illustrator')":
+        - apt install inkscape -y
+
+      - "Darktable (gestionnaire de photos libre sous forme de table lumineuse et chambre noir)":
+        - apt install darktable -y
+
+      - "Blender (suite libre de modélisation 3D, matériaux et textures, d'éclairage, d'animation...)":
+        - apt install blender -y
+
+      - "K-3D (animation et modélisation polygonale et modélisation par courbes)":
+        - apt install k3d -y
+
+      - "SweetHome 3D (aménagement d'intérieur pour dessiner les plans d'une maison, placement des meubles...)":
+        - apt install sweethome3d -y
+
+      - "LibreCAD (anciennement CADubuntu, DAO 2D pour modéliser des dessins techniques)":
+        - apt install librecad -y
+
+      - "Shutter [purple][Xorg only!][/purple] (pour effectuer des captures d'écran + appliquer des modifications diverses)":
+        - apt install shutter -y
+
+      - "Frogr (utile pour ceux qui utilisent le service web 'Flickr')":
+        - apt install frogr -y
+
+  - theme: "Traitement/encodage audio"
+    enabled: true
+    level: 2
+    description: "[blue]Quel(s) logiciel(s) pour l'encodage/réglage ou traitement audio voulez-vous ?[/blue]"
+    question: "Répondre par le ou les chiffres correspondants (exemple : 2 4)"
+    programs:
+      - "Xcfa : X Convert File Audio (extraction cd audio, piste dvd, normalisation, création pochette)":
+        - apt install xcfa -y
+
+      - "Sound-Juicer (pour extraire les pistes audios d'un cd)":
+        - apt install sound-juicer -y
+
+      - "Gnome Sound Recorder (pour enregistrer et lire du son, realisé par défaut avec OggVorbis)":
+        - apt install gnome-sound-recorder -y
+
+      - "Audacity (enregistrement et édition de son numérique)":
+        - apt install audacity -y
+
+      - "MhWaveEdit (application libre d'enregistrement et d'édition audio complète distribuée sous GPL)":
+        - apt install mhwaveedit -y
+
+      - "RipperX (une autre alternative pour extraire les cd de musique)":
+        - apt install ripperx -y
+
+      - "LMMS : Let's Make Music (station audio opensource crée par des musiciens pour les musiciens)":
+        - apt install lmms -y
+
+      - "Mixxx (logiciel pour Dj pour le mixage de musique)":
+        - apt install mixxx -y
+
+      - "Rosegarden (création musicale avec édition des partitions et peut s'interfacer avec des instruments)":
+        - apt install rosegarden -y
+
+      - "Pavucontrol (outil graphique de contrôle des volumes audio entrée/sortie pour Pulseaudio)":
+        - apt install pavucontrol -y
+
+      - "Lame (outil d'encodage en CLI pour le format MP3, par exemple pour convertir un Wav en Mp3)":
+        - apt install lame -y
+
+      - "Hydrogen (synthétiseur de boite à rythme basé sur les patterns avec connexion possible d'un séquenceur externe)":
+        - apt install hydrogen -y
+
+      - "Ardour (station de travail audio numérique avec enregistrement multipiste et mixage)":
+        - debconf-set-selections <<< "jackd/tweak_rt_limits false" ; apt install ardour -y
+
+      - "Flacon [yellow][Snap][/yellow] (pour extraire les pistes d'un gros fichier audio)":
+        - snap install flacon-tabetai
+
+      - "PulseEffects [blue][Flatpak][/blue] (interface puissante GTK pour faire plein de réglages/effets sur le son)":
+        - flatpak install --from https://flathub.org/repo/appstream/com.github.wwmm.pulseeffects.flatpakref -y
+
+
