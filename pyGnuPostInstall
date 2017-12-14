@@ -177,17 +177,17 @@ class FastInstallation(object):
 	# ----------------------------------------------------------------------
 	def __init__(self, question, installation_mode = 2, env = None):
 		super(FastInstallation, self).__init__()
-		self.question = question
+		# self.question = question
 		self.installation_mode = installation_mode
 		self.environment_running = env
 
 		# extract informations
 		self.enabled = True if "enabled" in question.keys() and str(question["enabled"]).lower() in ["yes", "1", "oui", "true", "o", "y", "t"] else False
 		self.max_level = question["level"] if "level" in question.keys() else 2
-		self.theme = question["theme"]
-		self.description = question["description"]
+		self.theme = question["theme"] if "theme" in question.keys() else "Current Theme"
+		self.description = question["description"] if "description" in question.keys() else "description writing..."
 		self.user_question = question["question"] if "question" in question.keys() else "Give your options with space between choice (3 7 13)"
-		self.programs = question["programs"]
+		self.programs = question["programs"] if "programs" in question.keys() else {}
 
 		# list of installations sequences
 		self._programs_sequences = []
